@@ -1,0 +1,11 @@
+{
+  "Type": "Code",
+  "Name": "RedirectFix",
+  "ModID": "redirectfix",
+  "Description": "Fixes the client crash on server redirect.",
+  "Version": "1.0.0",
+  "Side": "Universal",
+  "RequiredOnClient": true,
+  "RequiredOnServer": false,
+  "Authors": [ "Tsu (imtsubaki)" ]
+}
