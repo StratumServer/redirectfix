@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+env:
+  VS_VERSION: '1.22.6'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Fetch the game assemblies
+        run: |
+          mkdir -p "$RUNNER_TEMP/vs"
+          curl -sSL --fail -o "$RUNNER_TEMP/vs.tar.gz" \
+            "https://cdn.vintagestory.at/gamefiles/stable/vs_server_linux-x64_${VS_VERSION}.tar.gz"
+          tar xzf "$RUNNER_TEMP/vs.tar.gz" -C "$RUNNER_TEMP/vs"
+
+      - name: Build
+        env:
+          VINTAGE_STORY: ${{ runner.temp }}/vs
+        run: dotnet build RedirectFix.csproj -c Release --nologo
+
+      # The mod loader reads modinfo.json from the archive root. A wrapping
+      # folder makes it skip the mod with a null reference, which is how the
+      # v1.0.0 asset shipped broken, so the layout is asserted here rather than
+      # trusted. `zip` also writes forward slashes, unlike a Windows right-click.
+      - name: Pack
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          STAGE="$RUNNER_TEMP/pack"
+          mkdir -p "$STAGE"
+          cp modinfo.json "$STAGE/"
+          cp bin/Release/net10.0/RedirectFix.dll "$STAGE/"
+          (cd "$STAGE" && zip -q -r "$GITHUB_WORKSPACE/redirectfix-$VERSION.zip" modinfo.json RedirectFix.dll)
+
+          if ! unzip -l "redirectfix-$VERSION.zip" | grep -qE ' modinfo\.json$'; then
+            echo "modinfo.json is not at the archive root" >&2
+            unzip -l "redirectfix-$VERSION.zip" >&2
+            exit 1
+          fi
+          unzip -l "redirectfix-$VERSION.zip"
+
+      - name: Check the declared version matches the tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          IN_MODINFO=$(grep -oP '"Version"\s*:\s*"\K[^"]+' modinfo.json)
+          if [ "$VERSION" != "$IN_MODINFO" ]; then
+            echo "tag $GITHUB_REF_NAME does not match modinfo.json version $IN_MODINFO" >&2
+            exit 1
+          fi
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" "redirectfix-$VERSION.zip" \
+            --title "RedirectFix $GITHUB_REF_NAME" --generate-notes

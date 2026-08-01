@@ -9,10 +9,25 @@
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
+  <!-- Where the game assemblies come from.
+
+       Set VINTAGE_STORY to a Vintage Story install (or an extracted server
+       package) and everything resolves from there, which is what lets this
+       build on a clean machine and in CI. Without it the old layout still
+       applies: a checkout sitting inside the game source tree, with the install
+       at GameInstallDir. Override GameInstallDir on the command line rather than
+       editing it, so a local path never ends up in a commit. -->
   <PropertyGroup>
-    <GameInstallDir>A:\VintageStory\</GameInstallDir>
-    <GameLibBinDir>$(MSBuildThisFileDirectory)..\..\VintagestoryLib\bin\$(Configuration)\net10.0\</GameLibBinDir>
-    <ApiBinDir>$(MSBuildThisFileDirectory)..\..\bin\$(Configuration)\net10.0\</ApiBinDir>
+    <GameInstallDir Condition="'$(GameInstallDir)' == ''">A:\VintageStory\</GameInstallDir>
+    <VintageStoryDir>$(VINTAGE_STORY)</VintageStoryDir>
+
+    <ApiBinDir Condition="'$(VintageStoryDir)' != ''">$(VintageStoryDir)/</ApiBinDir>
+    <GameLibBinDir Condition="'$(VintageStoryDir)' != ''">$(VintageStoryDir)/</GameLibBinDir>
+    <HarmonyDir Condition="'$(VintageStoryDir)' != ''">$(VintageStoryDir)/Lib/</HarmonyDir>
+
+    <ApiBinDir Condition="'$(ApiBinDir)' == ''">$(MSBuildThisFileDirectory)..\..\bin\$(Configuration)\net10.0\</ApiBinDir>
+    <GameLibBinDir Condition="'$(GameLibBinDir)' == ''">$(MSBuildThisFileDirectory)..\..\VintagestoryLib\bin\$(Configuration)\net10.0\</GameLibBinDir>
+    <HarmonyDir Condition="'$(HarmonyDir)' == ''">$(GameInstallDir)Lib\</HarmonyDir>
   </PropertyGroup>
 
   <ItemGroup>
@@ -25,7 +40,7 @@
       <Private>false</Private>
     </Reference>
     <Reference Include="0Harmony">
-      <HintPath>$(GameInstallDir)Lib\0Harmony.dll</HintPath>
+      <HintPath>$(HarmonyDir)0Harmony.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>
